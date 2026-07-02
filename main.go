@@ -1,12 +1,15 @@
 package main
 
 import (
+	"log"
 	"math/rand"
 	"net/http"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/gogo1/not-pho-backend/internal/database"
+	"github.com/gogo1/not-pho-backend/internal/handlers"
 )
 
 type PingResponse struct {
@@ -40,11 +43,21 @@ var messages = []string{
 }
 
 func main() {
+	db, err := database.Connect()
+	if err != nil {
+		log.Fatalf("database: %v", err)
+	}
+	if err := database.Seed(db); err != nil {
+		log.Fatalf("seed: %v", err)
+	}
+
+	beers := &handlers.BeerHandler{DB: db}
+
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:4200"},
-		AllowMethods:     []string{http.MethodGet, http.MethodOptions},
+		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
 		AllowCredentials: true,
 	}))
@@ -53,9 +66,15 @@ func main() {
 	{
 		api.GET("/ping", handlePing)
 		api.GET("/message", handleMessage)
+
+		api.GET("/beers", beers.List)
+		api.GET("/beers/:id", beers.Get)
+		api.POST("/beers", beers.Create)
+		api.PUT("/beers/:id", beers.Update)
+		api.DELETE("/beers/:id", beers.Delete)
 	}
 
-	r.Run(":8081")
+	r.Run(":8080")
 }
 
 func handlePing(c *gin.Context) {
